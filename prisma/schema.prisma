@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  email String @unique
+  name String
+  username String @unique
+  image String?
+  bio String?
+  isVerified Boolean @default(false)
+
+  // relations
+  tweets Tweet[]
+}
+
+model Tweet {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  content String
+  image String?
+
+  impression Int @default(0)
+
+  // relations
+  userId String @db.ObjectId
+  user User @relation(fields: [userId], references: [id])
+}

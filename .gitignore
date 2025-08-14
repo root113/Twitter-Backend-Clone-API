@@ -1,6 +1,8 @@
 .env
+.cred
+
 /node_modules
 /dist
-package.json
-package-lock.json
-tsconfig.json
+/dist-seed
+
+/src/generated/prisma
