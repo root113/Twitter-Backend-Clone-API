@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
     createTweet,
-    listTweets,
+    listAllTweets,
     getTweetById,
     updateTweetById,
     deleteTweetById
@@ -9,7 +9,7 @@ import {
 
 const router = Router();
 
-router.route('/').get(listTweets).post(createTweet);
+router.route('/').get(listAllTweets).post(createTweet);
 router.route('/:id')
     .get(getTweetById)
     .put(updateTweetById)

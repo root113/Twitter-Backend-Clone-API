@@ -2,11 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import userRoutes from './routes/userRoutes';
 import tweetRoutes from './routes/tweetRoutes';
-// import dbConnect
-// import errorHandler
 
 dotenv.config();
-// dbConnect();
 const app = express();
 
 app.use(express.json());

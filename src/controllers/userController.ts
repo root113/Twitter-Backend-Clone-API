@@ -1,9 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import { Logger } from '../utils/Logger';
-import { PrismaClient } from '../generated/prisma';
 import { UserService } from '../services/userService';
 
-const prisma = new PrismaClient();
 const userService = new UserService();
 
 const createUser = asyncHandler(async (req, res) => {
@@ -95,7 +93,7 @@ const deleteUserById = asyncHandler(async (req, res) => {
 
 export {
     createUser,
-    listAllUsers as listUsers,
+    listAllUsers,
     getUserById,
     updateUserById,
     deleteUserById

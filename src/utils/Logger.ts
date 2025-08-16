@@ -6,7 +6,9 @@ const Logger = {
     LOG_SERVICE: 'Service ',
     LOG_TYPECHECK_FAIL: 'Primitive type check failed',
     LOG_USER_NOT_FOUND: 'User not found!',
-    LOG_USER_FOUND: 'User exists in DB'
+    LOG_USER_FOUND: 'User exists in DB',
+    LOG_TWEET_NOT_FOUND: 'Tweet not found!',
+    LOG_TWEET_FOUND: 'Tweet exists in DB'
 } as const;
 
 export { Logger };
