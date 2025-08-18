@@ -1,3 +1,4 @@
+import HttpError from "../errors/HttpError";
 import { PrismaClient, User } from "../generated/prisma";
 import { Logger } from "../utils/Logger";
 
@@ -77,14 +78,24 @@ function isUser(user: User | null | undefined) {
 }
 
 export class UserService {
-    async createUser(email: string, name: string, username: string): Promise<{ payload: any; message: string; }> {
+    async createUser(email: string, name: string, username: string): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> createUser');
+
+        if(!email || !username) {
+            console.log('Mandatory credentials were not provided!');
+            throw new HttpError(400, 'Email and username are mandatory');
+        }
+
+        if(username.length <= 5) {
+            console.log('Username should be at least 5 characters long!');
+            throw new HttpError(409, 'Username should be at least 5 characters long!');
+        }
 
         const validation = validateUserCreds(email, username);
 
         if(!(await validation).valid) {
             console.log('Invalid parameters: ', (await validation).message);
-            return { payload: null, message: (await validation).message };
+            throw new HttpError(409, (await validation).message);
         }
 
         try {
@@ -100,15 +111,14 @@ export class UserService {
                 bio: newUser.bio
             };
 
-
-            return { payload: payload, message: 'User has been created successfuly' };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return { payload: null, message: 'Could not process the request due to a query error!' };
+            return { payload, message: 'User has been created successfuly' };
+        } catch(err: any) {
+            console.log('Database error while registering user', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
 
-    async listAllUsers() {
+    async listAllUsers(): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> listAllUser');
 
         try {
@@ -121,21 +131,21 @@ export class UserService {
                 bio: user.bio
             }));
 
-            return payload;
-        } catch(err) {
-            console.error('Database error: ', err);
-            return null;
+            return { payload, message: 'Operation successful' };
+        } catch(err: any) {
+            console.log('Database error while listing users', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
 
-    async getUserById(userId: any): Promise<{ payload: any, message: string, response: number }> {
+    async getUserById(userId: any): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> getUserById');
 
         const validation = validateTypes(userId);
 
         if(!validation.valid) {
             console.log(validation.message);
-            return { payload: null, message: validation.message, response: 400 };
+            throw new HttpError(400, validation.message);
         }
 
         try {
@@ -143,7 +153,7 @@ export class UserService {
             
             if(!isUser(getUser)) {
                 console.log(Logger.LOG_USER_NOT_FOUND);
-                return { payload: null, message: Logger.LOG_USER_NOT_FOUND, response: 404 };
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
 
             const payload = {
@@ -154,17 +164,17 @@ export class UserService {
                 bio: getUser?.bio
             };
             return { 
-                payload: payload, 
-                message: 'Successfuly retrieved user information',
-                response: 200
+                payload,
+                message: 'Successfuly retrieved user information'
             };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return { 
-                payload: null, 
-                message: 'An error has occured during the proccess!', 
-                response: 500
+        } catch(err: any) {
+            if (err.code === 'P2023') {
+                console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
+            
+            console.log('Database error while retrieving user information', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
 
@@ -173,7 +183,7 @@ export class UserService {
         name?: string, 
         image?: string, 
         bio?: string
-    ): Promise<{ payload: any; message: string; response: number; }>
+    ): Promise<{ payload: any, message: string }>
     {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> updateUserById');
 
@@ -181,7 +191,7 @@ export class UserService {
 
         if(!validation.valid) {
             console.log('Validation failed: ', validation.message);
-            return { payload: null, message: validation.message, response: 400 }
+            throw new HttpError(400, validation.message);
         }
 
         try {
@@ -196,11 +206,7 @@ export class UserService {
 
             if(!isUser(updatedUser)) {
                 console.log(Logger.LOG_USER_NOT_FOUND);
-                return { 
-                    payload: null, 
-                    message: Logger.LOG_USER_NOT_FOUND,
-                    response: 404 
-                };
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
 
             const payload = {
@@ -211,28 +217,28 @@ export class UserService {
                 bio: updatedUser.bio
             };
             return {
-                payload: payload,
-                message: 'User has been updated successfuly',
-                response: 200
+                payload,
+                message: 'User has been updated successfuly'
             };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return { 
-                payload: null, 
-                message: 'An error has occured during the proccess!', 
-                response: 500 
-            };
+        } catch(err: any) {
+            if (err.code === 'P2023') {
+                console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
+            }
+            
+            console.log('Database error while updating user information', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
 
-    async deleteUserById(userId: any): Promise<{ message: string, response: number }> {
+    async deleteUserById(userId: any) {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> deleteUserById');
 
         const validation = validateTypes(userId);
 
         if(!validation.valid) {
             console.log('Validation failed: ', validation.message);
-            return { message: validation.message, response: 400 };
+            throw new HttpError(400, validation.message);
         }
 
         try {
@@ -240,14 +246,19 @@ export class UserService {
             
             if(!isUser(deleteUser)) {
                 console.log(Logger.LOG_USER_NOT_FOUND);
-                return { message: Logger.LOG_USER_NOT_FOUND, response: 404 } ;
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
 
             await prisma.user.delete({ where: { id: userId} });
-            return { message: 'Successfuly deleted user entity', response: 204 };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return { message: 'An error has occured during the proccess!', response: 500 };
+            console.log('User has been deleted successfuly');
+        } catch(err: any) {
+            if (err.code === 'P2023') {
+                console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
+            }
+            
+            console.log('Database error while deleting user', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
 }

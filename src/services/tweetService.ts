@@ -1,4 +1,5 @@
 import { PrismaClient, Tweet, User } from "../generated/prisma";
+import HttpError from '../errors/HttpError';
 import { Logger } from "../utils/Logger";
 
 const prisma = new PrismaClient();
@@ -52,7 +53,7 @@ export class TweetService {
         content: string, 
         image: string, 
         userId: string
-    ): Promise<{ payload: any, message: string, response: number }>
+    ): Promise<{ payload: any, message: string }>
     {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> createTweet');
         
@@ -60,7 +61,7 @@ export class TweetService {
         
         if(!validation.valid) {
             console.log('Invalid parameters: ', validation.message);
-            return { payload: null, message: validation.message, response: 400 };
+            throw new HttpError(400, validation.message);
         }
 
         try {
@@ -68,11 +69,7 @@ export class TweetService {
         
             if(!isUser(tweetOwner)) {
                 console.log(Logger.LOG_USER_NOT_FOUND);
-                return {
-                    payload: null,
-                    message: Logger.LOG_USER_NOT_FOUND,
-                    response: 404
-                };
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
 
             const newTweet = await prisma.tweet.create({
@@ -87,28 +84,28 @@ export class TweetService {
             };
 
             return {
-                payload: payload,
-                message: 'Tweet has been created successfuly',
-                response: 201
+                payload,
+                message: 'Tweet has been created successfuly'
             };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return {
-                payload: null,
-                message: 'An error has occured during the proccess!',
-                response: 500
-            };
+        } catch(err: any) {
+            if (err.code === 'P2023') {
+                console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
+            }
+
+            console.log('Database error while creating tweet', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
 
-    async listAllUserTweets(userId: any): Promise<{ payload: any, message: string, response: number }> {
+    async listAllUserTweets(userId: any): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> listAllTweets');
 
         const validation = validateTypes(userId);
         
         if(!validation.valid) {
             console.log('Invalid parameters: ', validation.message);
-            return { payload: null, message: validation.message, response: 400 };
+            throw new HttpError(400, validation.message);
         }
 
         try {
@@ -116,7 +113,7 @@ export class TweetService {
         
             if(!isUser(tweetsOwner)) {
                 console.log(Logger.LOG_USER_NOT_FOUND);
-                return { payload: null, message: Logger.LOG_USER_NOT_FOUND, response: 404 };
+                throw new HttpError(404, Logger.LOG_USER_FOUND);
             }
 
             const allTweets = await prisma.tweet.findMany({ where: { userId: tweetsOwner!.id } });
@@ -127,21 +124,26 @@ export class TweetService {
                 impression: tweet.impression
             }));
             
-            return { payload: payload, message: 'Operation successful', response: 200 };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return { payload: null, message: 'An error has occured during the proccess!', response: 500 };
+            return { payload, message: 'Operation successful' };
+        } catch(err: any) {
+            if (err.code === 'P2023') {
+                console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
+                throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
+            }
+
+            console.log('Database error while retrieving tweets', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
     
-    async getTweetById(tweetId: any): Promise<{ payload: any, message: string, response: number }> {
+    async getTweetById(tweetId: any): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> getTweetById');
 
         const validation = validateTypes(tweetId);
         
         if(!validation.valid) {
             console.log('Invalid parameters: ', validation.message);
-            return { payload: null, message: validation.message, response: 400 };
+            throw new HttpError(400, validation.message);
         }
 
         try {
@@ -149,11 +151,7 @@ export class TweetService {
             
             if(!isTweet(getTweet)) {
                 console.log(Logger.LOG_TWEET_NOT_FOUND);
-                return { 
-                    payload: null, 
-                    message: Logger.LOG_TWEET_NOT_FOUND, 
-                    response: 404
-                };
+                throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
             }
 
             const payload = {
@@ -163,13 +161,17 @@ export class TweetService {
             };
 
             return {
-                payload: payload,
-                message: 'Successfuly retrieved user tweets',
-                response: 200
+                payload,
+                message: 'Successfuly retrieved tweet'
             };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return { payload: null, message: 'An error has occured during the proccess!', response: 500 };
+        } catch(err: any) {
+            if (err.code === 'P2023') {
+                console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
+                throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
+            }
+
+            console.log('Database error while retrieving tweet', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
     
@@ -177,29 +179,30 @@ export class TweetService {
         tweetId: any, 
         content?: any, 
         image?: any
-    ): Promise<{ payload: any, message: string, response: number }> {
+    ): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> updateTweetById');
 
         const validation = validateTypes(tweetId, content, image);
         
         if(!validation.valid) {
             console.log('Invalid parameters: ', validation.message);
-            return { payload: null, message: validation.message, response: 400 };
+            throw new HttpError(400, validation.message);
         }
+
+        const data: Record<string, any> = {
+            ...(content !== undefined && { content }),
+            ...(image !== undefined && { image })
+        };
 
         try {
             const getTweet = await prisma.tweet.update({ 
                 where: { id: tweetId }, 
-                data: { content, image }
+                data
             });
 
             if(!isTweet(getTweet)) {
                 console.log(Logger.LOG_TWEET_NOT_FOUND);
-                return { 
-                    payload: null, 
-                    message: Logger.LOG_TWEET_NOT_FOUND, 
-                    response: 404 
-                };
+                throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
             }
 
             const payload = {
@@ -208,24 +211,29 @@ export class TweetService {
                 impression: getTweet.impression
             };
             return {
-                payload: payload,
-                message: 'Tweet has been updated successfuly',
-                response: 200
+                payload,
+                message: 'Tweet has been updated successfuly'
             };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return { payload: null, message: 'An error has occured during the proccess!', response: 500 };
+        } catch(err: any) {
+            // Prisma throws known request error with code 'P2025'/'P2023' when record to update/delete not found
+            if (err.code === 'P2023') {
+                console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
+                throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
+            }
+
+            console.log('Database error while updating tweet', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
     
-    async deleteTweetById(tweetId: any): Promise<{ message: string, response: number }> {
+    async deleteTweetById(tweetId: any) {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> deleteTweetById');
 
         const validation = validateTypes(tweetId);
         
         if(!validation.valid) {
             console.log('Invalid parameters: ', validation.message);
-            return { message: validation.message, response: 400 };
+            throw new HttpError(400, validation.message);
         }
 
         try {
@@ -233,15 +241,19 @@ export class TweetService {
             
             if(!isTweet(deleteTweet)) {
                 console.log(Logger.LOG_TWEET_NOT_FOUND);
-                return { message: Logger.LOG_TWEET_NOT_FOUND, response: 404 };
+                throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
             }
 
             await prisma.tweet.delete({ where: { id: tweetId } });
             console.log('Tweet has been deleted successfuly');
-            return { message: 'Successfuly deleted user entity', response: 204 };
-        } catch(err) {
-            console.error('Database error: ', err);
-            return { message: 'An error has occured during the proccess!', response: 500 };
+        } catch(err: any) {
+            if (err.code === 'P2023') {
+                console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
+                throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
+            }
+
+            console.log('Database error while deleting tweet', err);
+            throw new HttpError(500, 'An error has occured during the proccess!');
         }
     }
 }
