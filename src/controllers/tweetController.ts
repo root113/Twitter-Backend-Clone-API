@@ -10,9 +10,10 @@ const createTweet = asyncHandler(async (req, res) => {
 
     try {
         const payload = await tweetService.createTweet(content, image, userId);
-        if(!payload) {
-            console.log(Logger.LOG_USER_NOT_FOUND);
-            res.status(404).json({ error: Logger.LOG_USER_NOT_FOUND });
+        
+        if(!payload.payload) {
+            console.log(payload.message);
+            res.status(payload.response).json({ error: Logger.LOG_USER_NOT_FOUND });
             return;
         }
 
@@ -30,9 +31,10 @@ const listAllTweets = asyncHandler(async (req, res) => {
 
     try {
         const payload = await tweetService.listAllUserTweets(id);
-        if(!payload) {
-            console.log(Logger.LOG_USER_NOT_FOUND);
-            res.status(404).json({ error: Logger.LOG_USER_NOT_FOUND });
+        
+        if(!payload.payload) {
+            console.log(payload.message);
+            res.status(payload.response).json({ error: payload.message });
             return;
         }
 
@@ -49,9 +51,10 @@ const getTweetById = asyncHandler(async (req, res) => {
 
     try {
         const payload = await tweetService.getTweetById(id);
-        if(!payload) {
-            console.log(Logger.LOG_TWEET_NOT_FOUND);
-            res.status(404).json({ error: Logger.LOG_TWEET_NOT_FOUND });
+        
+        if(!payload.payload) {
+            console.log(payload.message);
+            res.status(payload.response).json({ error: payload.message });
             return;
         }
 
@@ -69,11 +72,13 @@ const updateTweetById = asyncHandler(async (req, res) => {
     
     try {
         const payload = await tweetService.updateTweetById(id, content, image);
-        if(!payload) {
-            console.log(Logger.LOG_TWEET_NOT_FOUND);
-            res.status(404).json({ error: Logger.LOG_TWEET_NOT_FOUND });
+        
+        if(!payload.payload) {
+            console.log(payload.message);
+            res.status(payload.response).json({ error: payload.message });
             return;
         }
+
         res.status(200).json(payload);
     } catch(err) {
         console.error('Database error: ', err);
@@ -86,7 +91,13 @@ const deleteTweetById = asyncHandler(async (req, res) => {
     const { id } = req.params;
     
     try {
-        await tweetService.deleteTweetById(id);
+        const response = await tweetService.deleteTweetById(id);
+
+        if(response.response != 204) {
+            console.log(response.message);
+            res.status(response.response).json({ error: response.message });
+            return;
+        }
         console.log('User has been deleted successfuly');
 
         const deletedAt = new Date();

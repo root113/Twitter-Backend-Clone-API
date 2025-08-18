@@ -3,19 +3,26 @@ import { Logger } from "../utils/Logger";
 
 const prisma = new PrismaClient();
 
-function isMultiTypecheck(value_1: any, value_2?: any, value_3?: any) {
-    console.log('Typechecking the value(s)...');
+function validateTypes(
+    value_id: unknown,
+    value_1?: unknown,
+    value_2?: unknown
+): { valid: boolean; message: string } {
+    console.log('Validating types...');
 
-    if(
-        typeof value_1 === 'string' || 
-        typeof value_2 === 'string' ||
-        typeof value_3 === 'string'
-    ) {
-        console.log('Typecheck successful');
-        return true;
+    if(typeof value_id !== 'string' ) {
+        return { valid: false, message: 'Tweet ID must be a string!' }
     }
-    console.log('Typecheck failed');
-    return false;
+
+    if(value_1 !== undefined && typeof value_1 !== 'string' ) {
+        return { valid: false, message: 'Content must be a string!' }
+    }
+
+    if(value_2 !== undefined && typeof value_2 !== 'string' ) {
+        return { valid: false, message: 'Image must be a string!' }
+    }
+
+    return { valid: true, message: 'Validation successful' };
 }
 
 function isUser(user: User | null | undefined) {
@@ -41,119 +48,200 @@ function isTweet(tweet: Tweet | null | undefined) {
 }
 
 export class TweetService {
-    async createTweet(content: string, image: string, userId: string) {
+    async createTweet(
+        content: string, 
+        image: string, 
+        userId: string
+    ): Promise<{ payload: any, message: string, response: number }>
+    {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> createTweet');
         
-        const tweetOwner = await prisma.user.findUnique({ where: { id: userId } });
+        const validation = validateTypes(userId);
         
-        if(!isMultiTypecheck(content, image, userId)) {
-            console.log('Invalid parameters');
-            return;
-        }
-        
-        if(!isUser(tweetOwner)) {
-            console.log(Logger.LOG_USER_NOT_FOUND);
-            return null;
+        if(!validation.valid) {
+            console.log('Invalid parameters: ', validation.message);
+            return { payload: null, message: validation.message, response: 400 };
         }
 
-        const newTweet = await prisma.tweet.create({
-            data: { content, image, userId }
-        });
-        console.log('Tweet has been created successfuly');
+        try {
+            const tweetOwner = await prisma.user.findUnique({ where: { id: userId } });
+        
+            if(!isUser(tweetOwner)) {
+                console.log(Logger.LOG_USER_NOT_FOUND);
+                return {
+                    payload: null,
+                    message: Logger.LOG_USER_NOT_FOUND,
+                    response: 404
+                };
+            }
 
-        const payload = {
-            content: newTweet.content,
-            image: newTweet.image,
-            impression: newTweet.impression
-        };
-        return payload;
+            const newTweet = await prisma.tweet.create({
+                data: { content, image, userId }
+            });
+            console.log('Tweet has been created successfuly');
+
+            const payload = {
+                content: newTweet.content,
+                image: newTweet.image,
+                impression: newTweet.impression
+            };
+
+            return {
+                payload: payload,
+                message: 'Tweet has been created successfuly',
+                response: 201
+            };
+        } catch(err) {
+            console.error('Database error: ', err);
+            return {
+                payload: null,
+                message: 'An error has occured during the proccess!',
+                response: 500
+            };
+        }
     }
 
-    async listAllUserTweets(userId: any) {
+    async listAllUserTweets(userId: any): Promise<{ payload: any, message: string, response: number }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> listAllTweets');
 
-        if(!isMultiTypecheck(userId)) {
-            console.log('Invalid user ID!');
-            return;
+        const validation = validateTypes(userId);
+        
+        if(!validation.valid) {
+            console.log('Invalid parameters: ', validation.message);
+            return { payload: null, message: validation.message, response: 400 };
         }
 
-        const tweetsOwner = await prisma.user.findUnique({ where: { id: userId } });
-        if(!isUser(tweetsOwner)) {
-            console.log(Logger.LOG_USER_NOT_FOUND);
-            return null;
-        }
+        try {
+            const tweetsOwner = await prisma.user.findUnique({ where: { id: userId } });
+        
+            if(!isUser(tweetsOwner)) {
+                console.log(Logger.LOG_USER_NOT_FOUND);
+                return { payload: null, message: Logger.LOG_USER_NOT_FOUND, response: 404 };
+            }
 
-        const allTweets = await prisma.tweet.findMany({ where: { userId: tweetsOwner!.id } });
-        const payload = allTweets.map(tweet => ({
-            content: tweet.content,
-            image: tweet.image,
-            impression: tweet.impression
-        }));
-        return payload;
+            const allTweets = await prisma.tweet.findMany({ where: { userId: tweetsOwner!.id } });
+            
+            const payload = allTweets.map(tweet => ({
+                content: tweet.content,
+                image: tweet.image,
+                impression: tweet.impression
+            }));
+            
+            return { payload: payload, message: 'Operation successful', response: 200 };
+        } catch(err) {
+            console.error('Database error: ', err);
+            return { payload: null, message: 'An error has occured during the proccess!', response: 500 };
+        }
     }
     
-    async getTweetById(tweetId: any) {
+    async getTweetById(tweetId: any): Promise<{ payload: any, message: string, response: number }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> getTweetById');
 
-        if(!isMultiTypecheck(tweetId)) {
-            console.log('Invalid tweet ID!');
-            return;
+        const validation = validateTypes(tweetId);
+        
+        if(!validation.valid) {
+            console.log('Invalid parameters: ', validation.message);
+            return { payload: null, message: validation.message, response: 400 };
         }
 
-        const getTweet = await prisma.tweet.findUnique({ where: { id: tweetId } });
-        if(!isTweet(getTweet)) {
-            console.log(Logger.LOG_TWEET_NOT_FOUND);
-            return;
-        }
+        try {
+            const getTweet = await prisma.tweet.findUnique({ where: { id: tweetId } });
+            
+            if(!isTweet(getTweet)) {
+                console.log(Logger.LOG_TWEET_NOT_FOUND);
+                return { 
+                    payload: null, 
+                    message: Logger.LOG_TWEET_NOT_FOUND, 
+                    response: 404
+                };
+            }
 
-        const payload = {
-            content: getTweet?.content,
-            image: getTweet?.image,
-            impression: getTweet?.impression
-        };
-        return payload;
+            const payload = {
+                content: getTweet?.content,
+                image: getTweet?.image,
+                impression: getTweet?.impression
+            };
+
+            return {
+                payload: payload,
+                message: 'Successfuly retrieved user tweets',
+                response: 200
+            };
+        } catch(err) {
+            console.error('Database error: ', err);
+            return { payload: null, message: 'An error has occured during the proccess!', response: 500 };
+        }
     }
     
-    async updateTweetById(tweetId: any, content?: any, image?: any) {
+    async updateTweetById(
+        tweetId: any, 
+        content?: any, 
+        image?: any
+    ): Promise<{ payload: any, message: string, response: number }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> updateTweetById');
 
-        if(!isMultiTypecheck(tweetId, content, image)) {
-            console.log('Invalid parameters!');
-            return;
+        const validation = validateTypes(tweetId, content, image);
+        
+        if(!validation.valid) {
+            console.log('Invalid parameters: ', validation.message);
+            return { payload: null, message: validation.message, response: 400 };
         }
 
-        const getTweet = await prisma.tweet.update({ 
-            where: { id: tweetId }, 
-            data: { content, image }
-        });
+        try {
+            const getTweet = await prisma.tweet.update({ 
+                where: { id: tweetId }, 
+                data: { content, image }
+            });
 
-        if(!isTweet(getTweet)) {
-            console.log(Logger.LOG_TWEET_NOT_FOUND);
-            return null;
+            if(!isTweet(getTweet)) {
+                console.log(Logger.LOG_TWEET_NOT_FOUND);
+                return { 
+                    payload: null, 
+                    message: Logger.LOG_TWEET_NOT_FOUND, 
+                    response: 404 
+                };
+            }
+
+            const payload = {
+                content: getTweet.content,
+                image: getTweet.image,
+                impression: getTweet.impression
+            };
+            return {
+                payload: payload,
+                message: 'Tweet has been updated successfuly',
+                response: 200
+            };
+        } catch(err) {
+            console.error('Database error: ', err);
+            return { payload: null, message: 'An error has occured during the proccess!', response: 500 };
         }
-
-        const payload = {
-            content: getTweet.content,
-            image: getTweet.image,
-            impression: getTweet.impression
-        };
-        return payload;
     }
     
-    async deleteTweetById(tweetId: any) {
+    async deleteTweetById(tweetId: any): Promise<{ message: string, response: number }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> deleteTweetById');
 
-        if(!isMultiTypecheck(tweetId)) {
-            console.log('Invalid tweet ID!');
-            return;
+        const validation = validateTypes(tweetId);
+        
+        if(!validation.valid) {
+            console.log('Invalid parameters: ', validation.message);
+            return { message: validation.message, response: 400 };
         }
 
-        const deleteTweet = await prisma.tweet.findUnique({ where: { id: tweetId } });
-        if(!isTweet(deleteTweet)) {
-            console.log(Logger.LOG_TWEET_NOT_FOUND);
-            return null;
-        }
+        try {
+            const deleteTweet = await prisma.tweet.findUnique({ where: { id: tweetId } });
+            
+            if(!isTweet(deleteTweet)) {
+                console.log(Logger.LOG_TWEET_NOT_FOUND);
+                return { message: Logger.LOG_TWEET_NOT_FOUND, response: 404 };
+            }
 
-        return await prisma.tweet.delete({ where: { id: tweetId } });
+            await prisma.tweet.delete({ where: { id: tweetId } });
+            console.log('Tweet has been deleted successfuly');
+            return { message: 'Successfuly deleted user entity', response: 204 };
+        } catch(err) {
+            console.error('Database error: ', err);
+            return { message: 'An error has occured during the proccess!', response: 500 };
+        }
     }
 }

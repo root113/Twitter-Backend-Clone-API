@@ -11,6 +11,13 @@ const createUser = asyncHandler(async (req, res) => {
 
     try {
         const payload = await userService.createUser(email, name, username);
+
+        if(!payload.payload) {
+            console.log('User register has failed!');
+            res.status(409).json({ error: payload.message });
+            return;
+        }
+
         console.log('Payload: ', payload);
         res.status(201).json(payload);
     } catch(err) {
@@ -22,6 +29,12 @@ const createUser = asyncHandler(async (req, res) => {
 const listAllUsers = asyncHandler(async (req, res) => {
     console.log(Logger.LOG_NVG + Logger.LOG_CONTROLLER + 'User -> listUsers');
     const payload = await userService.listAllUsers();
+
+    if(!payload) {
+        console.log('An error has occured during the proccess!');
+        res.status(502).json({ error: 'Bad Gateway' });
+        return;
+    }
     console.log('Payload: ', payload);
     res.status(200).json(payload);
 });
@@ -33,14 +46,14 @@ const getUserById = asyncHandler(async (req, res) => {
     try {
         const payload = await userService.getUserById(id);
 
-        if(!payload) {
-            console.log(Logger.LOG_USER_NOT_FOUND);
-            res.status(404).json({ error: Logger.LOG_USER_NOT_FOUND });
+        if(!payload.payload) {
+            console.log(payload.message);
+            res.status(payload.response).json({ error: payload.message });
             return;
         }
 
         console.log('Payload to be sent: ', payload);
-        res.status(200).json(payload);
+        res.status(payload.response).json(payload);
     } catch (err) {
         console.error('Database error: ', err);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -74,7 +87,13 @@ const deleteUserById = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     try {
-        await userService.deleteUserById(id);
+        const response = await userService.deleteUserById(id);
+
+        if(response.response != 204) {
+            console.log(response.message);
+            res.status(response.response).json({ error: response.message });
+            return;
+        }
         console.log('User has been deleted successfuly');
 
         const deletedAt = new Date();
