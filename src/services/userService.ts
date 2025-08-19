@@ -1,45 +1,9 @@
 import HttpError from "../errors/HttpError";
 import { PrismaClient, User } from "../generated/prisma";
 import { Logger } from "../utils/Logger";
+import { toUserResponse } from "../mappers/user.mapper";
 
 const prisma = new PrismaClient();
-
-function validateTypes(
-    value_id: unknown,
-    value_1?: unknown,
-    value_2?: unknown,
-    value_3?: unknown,
-    value_4?: unknown,
-    value_5?: unknown
-): { valid: boolean; message: string } {
-    console.log('Validating types...');
-
-    if(typeof value_id !== 'string' ) {
-        return { valid: false, message: 'User ID must be a string!' }
-    }
-
-    if(value_1 !== undefined && typeof value_1 !== 'string' ) {
-        return { valid: false, message: 'Email must be a string!' }
-    }
-
-    if(value_2 !== undefined && typeof value_2 !== 'string' ) {
-        return { valid: false, message: 'Name must be a string!' }
-    }
-
-    if(value_3 !== undefined && typeof value_3 !== 'string' ) {
-        return { valid: false, message: 'Username must be a string!' }
-    }
-
-    if(value_4 !== undefined && typeof value_4 !== 'string' ) {
-        return { valid: false, message: 'Image must be a string!' }
-    }
-
-    if(value_5 !== undefined && typeof value_5 !== 'string' ) {
-        return { valid: false, message: 'Bio must be a string!' }
-    }
-
-    return { valid: true, message: 'Validation successful' };
-}
 
 async function validateUserCreds(email: string, username: string): Promise<{ valid: boolean; message: string; }> {
     console.log('Checking if credentials are unique...');
@@ -81,37 +45,12 @@ export class UserService {
     async createUser(email: string, name: string, username: string): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> createUser');
 
-        if(!email || !username) {
-            console.log('Mandatory credentials were not provided!');
-            throw new HttpError(400, 'Email and username are mandatory');
-        }
-
-        if(username.length <= 5) {
-            console.log('Username should be at least 5 characters long!');
-            throw new HttpError(409, 'Username should be at least 5 characters long!');
-        }
-
-        const validation = validateUserCreds(email, username);
-
-        if(!(await validation).valid) {
-            console.log('Invalid parameters: ', (await validation).message);
-            throw new HttpError(409, (await validation).message);
-        }
-
         try {
             const newUser = await prisma.user.create({
                 data: { email, name, username }
             });
 
-            const payload = {
-                email: newUser.email,
-                name: newUser.name,
-                username: newUser.username,
-                image: newUser.image,
-                bio: newUser.bio
-            };
-
-            return { payload, message: 'User has been created successfuly' };
+            return { payload: toUserResponse(newUser), message: 'User has been created successfuly' };
         } catch(err: any) {
             console.log('Database error while registering user', err);
             throw new HttpError(500, 'An error has occured during the proccess!');
@@ -123,14 +62,7 @@ export class UserService {
 
         try {
             const allUsers = await prisma.user.findMany();
-            const payload = allUsers.map(user => ({
-                email: user.email,
-                name: user.name,
-                username: user.username,
-                image: user.image,
-                bio: user.bio
-            }));
-
+            const payload = allUsers.map(user => toUserResponse(user));
             return { payload, message: 'Operation successful' };
         } catch(err: any) {
             console.log('Database error while listing users', err);
@@ -141,13 +73,6 @@ export class UserService {
     async getUserById(userId: any): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> getUserById');
 
-        const validation = validateTypes(userId);
-
-        if(!validation.valid) {
-            console.log(validation.message);
-            throw new HttpError(400, validation.message);
-        }
-
         try {
             const getUser = await prisma.user.findUnique({ where: { id: userId } });
             
@@ -156,19 +81,12 @@ export class UserService {
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
 
-            const payload = {
-                email: getUser?.email,
-                name: getUser?.name,
-                username: getUser?.username,
-                image: getUser?.image,
-                bio: getUser?.bio
-            };
             return { 
-                payload,
+                payload: toUserResponse(getUser!),
                 message: 'Successfuly retrieved user information'
             };
         } catch(err: any) {
-            if (err.code === 'P2023') {
+            if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
@@ -181,18 +99,11 @@ export class UserService {
     async updateUserById(
         userId: any, 
         name?: string, 
-        image?: string, 
+        image?: string | null, 
         bio?: string
     ): Promise<{ payload: any, message: string }>
     {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> updateUserById');
-
-        const validation = validateTypes(userId, name, image, bio);
-
-        if(!validation.valid) {
-            console.log('Validation failed: ', validation.message);
-            throw new HttpError(400, validation.message);
-        }
 
         try {
             const updatedUser = await prisma.user.update({
@@ -209,19 +120,12 @@ export class UserService {
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
 
-            const payload = {
-                email: updatedUser.email,
-                name: updatedUser.name,
-                username: updatedUser.username,
-                image: updatedUser.image,
-                bio: updatedUser.bio
-            };
             return {
-                payload,
+                payload: toUserResponse(updatedUser),
                 message: 'User has been updated successfuly'
             };
         } catch(err: any) {
-            if (err.code === 'P2023') {
+            if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
@@ -234,13 +138,6 @@ export class UserService {
     async deleteUserById(userId: any) {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'User -> deleteUserById');
 
-        const validation = validateTypes(userId);
-
-        if(!validation.valid) {
-            console.log('Validation failed: ', validation.message);
-            throw new HttpError(400, validation.message);
-        }
-
         try {
             const deleteUser = await prisma.user.findUnique({ where: { id: userId} });
             
@@ -252,7 +149,7 @@ export class UserService {
             await prisma.user.delete({ where: { id: userId} });
             console.log('User has been deleted successfuly');
         } catch(err: any) {
-            if (err.code === 'P2023') {
+            if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }

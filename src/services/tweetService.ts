@@ -1,30 +1,9 @@
 import { PrismaClient, Tweet, User } from "../generated/prisma";
 import HttpError from '../errors/HttpError';
 import { Logger } from "../utils/Logger";
+import { toTweetResponse } from "../mappers/tweet.mapper";
 
 const prisma = new PrismaClient();
-
-function validateTypes(
-    value_id: unknown,
-    value_1?: unknown,
-    value_2?: unknown
-): { valid: boolean; message: string } {
-    console.log('Validating types...');
-
-    if(typeof value_id !== 'string' ) {
-        return { valid: false, message: 'Tweet ID must be a string!' }
-    }
-
-    if(value_1 !== undefined && typeof value_1 !== 'string' ) {
-        return { valid: false, message: 'Content must be a string!' }
-    }
-
-    if(value_2 !== undefined && typeof value_2 !== 'string' ) {
-        return { valid: false, message: 'Image must be a string!' }
-    }
-
-    return { valid: true, message: 'Validation successful' };
-}
 
 function isUser(user: User | null | undefined) {
     console.log('Checking DB entities if user exists with the id provided...');
@@ -51,18 +30,11 @@ function isTweet(tweet: Tweet | null | undefined) {
 export class TweetService {
     async createTweet(
         content: string, 
-        image: string, 
-        userId: string
+        userId: string,
+        image: string | null
     ): Promise<{ payload: any, message: string }>
     {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> createTweet');
-        
-        const validation = validateTypes(userId);
-        
-        if(!validation.valid) {
-            console.log('Invalid parameters: ', validation.message);
-            throw new HttpError(400, validation.message);
-        }
 
         try {
             const tweetOwner = await prisma.user.findUnique({ where: { id: userId } });
@@ -77,18 +49,12 @@ export class TweetService {
             });
             console.log('Tweet has been created successfuly');
 
-            const payload = {
-                content: newTweet.content,
-                image: newTweet.image,
-                impression: newTweet.impression
-            };
-
             return {
-                payload,
+                payload: toTweetResponse(newTweet),
                 message: 'Tweet has been created successfuly'
             };
         } catch(err: any) {
-            if (err.code === 'P2023') {
+            if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
@@ -101,13 +67,6 @@ export class TweetService {
     async listAllUserTweets(userId: any): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> listAllTweets');
 
-        const validation = validateTypes(userId);
-        
-        if(!validation.valid) {
-            console.log('Invalid parameters: ', validation.message);
-            throw new HttpError(400, validation.message);
-        }
-
         try {
             const tweetsOwner = await prisma.user.findUnique({ where: { id: userId } });
         
@@ -117,16 +76,10 @@ export class TweetService {
             }
 
             const allTweets = await prisma.tweet.findMany({ where: { userId: tweetsOwner!.id } });
-            
-            const payload = allTweets.map(tweet => ({
-                content: tweet.content,
-                image: tweet.image,
-                impression: tweet.impression
-            }));
-            
+            const payload = allTweets.map(tweet => toTweetResponse(tweet));            
             return { payload, message: 'Operation successful' };
         } catch(err: any) {
-            if (err.code === 'P2023') {
+            if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
             }
@@ -139,13 +92,6 @@ export class TweetService {
     async getTweetById(tweetId: any): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> getTweetById');
 
-        const validation = validateTypes(tweetId);
-        
-        if(!validation.valid) {
-            console.log('Invalid parameters: ', validation.message);
-            throw new HttpError(400, validation.message);
-        }
-
         try {
             const getTweet = await prisma.tweet.findUnique({ where: { id: tweetId } });
             
@@ -154,18 +100,12 @@ export class TweetService {
                 throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
             }
 
-            const payload = {
-                content: getTweet?.content,
-                image: getTweet?.image,
-                impression: getTweet?.impression
-            };
-
             return {
-                payload,
+                payload: toTweetResponse(getTweet!),
                 message: 'Successfuly retrieved tweet'
             };
         } catch(err: any) {
-            if (err.code === 'P2023') {
+            if (err?.code === 'P2023') {
                 console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
             }
@@ -181,13 +121,6 @@ export class TweetService {
         image?: any
     ): Promise<{ payload: any, message: string }> {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> updateTweetById');
-
-        const validation = validateTypes(tweetId, content, image);
-        
-        if(!validation.valid) {
-            console.log('Invalid parameters: ', validation.message);
-            throw new HttpError(400, validation.message);
-        }
 
         const data: Record<string, any> = {
             ...(content !== undefined && { content }),
@@ -205,18 +138,12 @@ export class TweetService {
                 throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
             }
 
-            const payload = {
-                content: getTweet.content,
-                image: getTweet.image,
-                impression: getTweet.impression
-            };
             return {
-                payload,
+                payload: toTweetResponse(getTweet),
                 message: 'Tweet has been updated successfuly'
             };
         } catch(err: any) {
-            // Prisma throws known request error with code 'P2025'/'P2023' when record to update/delete not found
-            if (err.code === 'P2023') {
+            if (err?.code === 'P2023') {
                 console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
             }
@@ -229,13 +156,6 @@ export class TweetService {
     async deleteTweetById(tweetId: any) {
         console.log(Logger.LOG_NVG + Logger.LOG_SERVICE + 'Tweet -> deleteTweetById');
 
-        const validation = validateTypes(tweetId);
-        
-        if(!validation.valid) {
-            console.log('Invalid parameters: ', validation.message);
-            throw new HttpError(400, validation.message);
-        }
-
         try {
             const deleteTweet = await prisma.tweet.findUnique({ where: { id: tweetId } });
             
@@ -247,7 +167,7 @@ export class TweetService {
             await prisma.tweet.delete({ where: { id: tweetId } });
             console.log('Tweet has been deleted successfuly');
         } catch(err: any) {
-            if (err.code === 'P2023') {
+            if (err?.code === 'P2023') {
                 console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
             }
