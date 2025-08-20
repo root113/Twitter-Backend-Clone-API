@@ -1,9 +1,8 @@
 import HttpError from "../errors/HttpError";
-import { PrismaClient, User } from "../generated/prisma";
+import { User } from "../generated/prisma";
 import { Logger } from "../utils/Logger";
 import { toUserResponse } from "../mappers/user.mapper";
-
-const prisma = new PrismaClient();
+import { prisma } from "../clients/prisma";
 
 function isUser(user: User | null | undefined) {
     console.log('Checking DB entities if user exists with the id provided...');

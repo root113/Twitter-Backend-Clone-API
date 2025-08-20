@@ -1,9 +1,8 @@
-import { PrismaClient, Tweet, User } from "../generated/prisma";
+import { Tweet, User } from "../generated/prisma";
 import HttpError from '../errors/HttpError';
 import { Logger } from "../utils/Logger";
 import { toTweetResponse } from "../mappers/tweet.mapper";
-
-const prisma = new PrismaClient();
+import { prisma } from "../clients/prisma";
 
 function isUser(user: User | null | undefined) {
     console.log('Checking DB entities if user exists with the id provided...');
