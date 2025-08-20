@@ -21,7 +21,6 @@ export type UpdateTweetBodyDto = z.infer<typeof UpdateTweetBodyDto>;
 
 // Response
 export const TweetResponseDto = z.object({
-    id: z.string().regex(/^[a-f\d]{24}$/i),
     content: z.string(),
     image: z.url().optional().nullable(),
     impression: z.number().int()

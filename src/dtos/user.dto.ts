@@ -15,7 +15,6 @@ export const UpdateUserBodyDto = z.object({
 export type UpdateUserBodyDto = z.infer<typeof UpdateUserBodyDto>;
 
 export const UserResponseDto = z.object({
-    id: z.string().regex(/^[a-f\d]{24}$/i),
     email: z.email(),
     name: z.string(),
     username: z.string(),

@@ -5,31 +5,6 @@ import { toUserResponse } from "../mappers/user.mapper";
 
 const prisma = new PrismaClient();
 
-async function validateUserCreds(email: string, username: string): Promise<{ valid: boolean; message: string; }> {
-    console.log('Checking if credentials are unique...');
-
-    try {
-        const intendedUser = await prisma.user.findUnique({
-            where: { email: email, username: username }
-        });
-
-        if(intendedUser && intendedUser.email == email) {
-            console.log('A user account associated with that email already exists!');
-            return { valid: false, message: 'A user account associated with that email already exists!' }
-        }
-
-        if(intendedUser && intendedUser.username == username) {
-            console.log('This username has already taken!');
-            return { valid: false, message: 'This username has already taken!' }
-        }
-
-        return { valid: true, message: 'Credentials are unique' };
-    } catch(err) {
-        console.error('Database error: ', err);
-        return { valid: false, message: 'An error has occured during the DB query!' }
-    }
-}
-
 function isUser(user: User | null | undefined) {
     console.log('Checking DB entities if user exists with the id provided...');
 
