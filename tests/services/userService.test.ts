@@ -1,5 +1,10 @@
-/**
- *? Tests UserService methods by mocking the prisma client exported from ../clients/prisma
+/*
+    ^ Unit tests for UserService covering: 
+    ?  - createUser (success, db error)
+    ?  - listAllUsers (success, db error)
+    ?  - getUserById (success, not-found, Prisma P2023, other db error)
+    ?  - updateUserById (success, Prisma P2023 -> 404, other db error)
+    ?  - deleteUserById (success, not-found, Prisma P2023 -> 404, other db error)
 */
 
 interface MockedUserMethods {
@@ -18,6 +23,7 @@ jest.mock('../../src/clients/prisma', () => {
         update: jest.fn(),
         delete: jest.fn(),
     };
+    // tweet not used in these tests but keep shape consistent
     const tweet = {
         create: jest.fn(),
         findMany: jest.fn(),
@@ -31,24 +37,24 @@ jest.mock('../../src/clients/prisma', () => {
 import { prisma } from '../../src/clients/prisma';
 import { UserService } from '../../src/services/userService';
 import HttpError from '../../src/errors/HttpError';
+import { email } from 'zod';
 
 const mockedPrisma = prisma as unknown as {
     user: MockedUserMethods;
+    tweet: Record<string, jest.Mock>
 };
 
-describe('UserService', () => {
+describe('UserService (unit)', () => {
     const service = new UserService();
 
     beforeEach(() => {
         // jest.resetAllMocks();
-        Object.values(mockedPrisma.user).forEach(mockFn => {
-            if(typeof mockFn.mockReset === 'function') {
-                mockFn.mockReset();
-            }
-        });
+        Object.values(mockedPrisma.user).forEach((m: any) => m?.mockReset && m.mockReset());
+        Object.values(mockedPrisma.tweet).forEach((m: any) => m?.mockReset && m.mockReset());
     });
 
-    test('createUser -> returns mapped payload on success', async () => {
+    //* ---- createUser ----
+    test('createUser - success returns mapped payload', async () => {
         const dbUser = {
             id: '507f1f77bcf86cd799439011',
             email: 'alice@example.com',
@@ -62,7 +68,11 @@ describe('UserService', () => {
         const result = await service.createUser(dbUser.email, dbUser.name, dbUser.username);
 
         expect(mockedPrisma.user.create).toHaveBeenCalledWith({
-            data: { email: dbUser.email, name: dbUser.name, username: dbUser.username },
+            data: { 
+                email: dbUser.email, 
+                name: dbUser.name, 
+                username: dbUser.username 
+            },
         });
 
         expect(result.payload).toEqual({
@@ -72,26 +82,41 @@ describe('UserService', () => {
             image: null,
             bio: null,
         });
-        expect(result.message).toMatch(/created/i);
+        expect(result.message.toLowerCase()).toContain('created');
     });
 
-    test('createUser -> database error leads to HttpError 500', async () => {
+    test('createUser - database error -> throws HttpError 500', async () => {
         mockedPrisma.user.create.mockRejectedValue(new Error('DB down'));
-
-        await expect(service.createUser('a@b.com', 'A', 'aaa')).rejects.toMatchObject({
-            status: 500,
-        });
+        await expect(service.createUser('a@b.com', 'A', 'aaa')).rejects.toMatchObject({ status: 500 });
     });
 
-    test('getUserById -> not found throws HttpError 404', async () => {
-        mockedPrisma.user.findUnique.mockResolvedValue(null);
+    //* ---- listAllUsers ----
+    test('listAllUsers - success returns mapped list', async () => {
+        const dbUsers = [
+            { id: '1', email: 'a@b', name: 'A', username: 'aa', image: null, bio: null },
+            { id: '2', email: 'a@b', name: 'C', username: 'cc', image: null, bio: 'hi' }
+        ];
+        mockedPrisma.user.findMany.mockResolvedValue(dbUsers);
 
-        await expect(service.getUserById('507f1f77bcf86cd799439011')).rejects.toMatchObject({
-            status: 404,
-        });
+        const result = await service.listAllUsers();
+        expect(mockedPrisma.user.findMany).toHaveBeenCalled();
+        expect(result.payload).toEqual(dbUsers.map(u => ({
+            email: u.email,
+            name: u.name,
+            username: u.username,
+            image: null,
+            bio: u.bio
+        })));
+        expect(result.message).toMatch(/operation successful/i);
     });
 
-    test('getUserById -> success returns mapped user', async () => {
+    test('listAllUsers - database error -> throws HttpError 500', async () => {
+        mockedPrisma.user.findMany.mockRejectedValue(new Error('fail listing'));
+        await expect(service.listAllUsers()).rejects.toMatchObject({ status: 500 });
+    });
+
+    //* ---- getUserById ----
+    test('getUserById - success returns mapped user', async () => {
         const dbUser = {
             id: '507f1f77bcf86cd799439011',
             email: 'bob@example.com',
@@ -102,16 +127,101 @@ describe('UserService', () => {
         };
         mockedPrisma.user.findUnique.mockResolvedValue(dbUser);
 
-        const res = await service.getUserById(dbUser.id);
-        expect(res.payload).toEqual({
+        const result = await service.getUserById(dbUser.id);
+        expect(result.payload).toEqual({
             email: dbUser.email,
             name: dbUser.name,
             username: dbUser.username,
             image: null,
             bio: 'hello',
         });
-        expect(res.message).toMatch(/retrieved/i);
+        expect(result.message).toMatch(/retrieved/i);
+    });
+    
+    test('getUserById - not found -> throws HttpError 404', async () => {
+        mockedPrisma.user.findUnique.mockResolvedValue(null);
+        await expect(service.getUserById('507f1f77bcf86cd799439011')).rejects.toMatchObject({ status: 404 });
     });
 
-  // TODO: add more tests: listAllUsers, updateUserById success + not found, deleteUserById success + not found
+    test('getUserById - Prisma P2023 -> maps to 404', async () => {
+        mockedPrisma.user.findUnique.mockRejectedValue({
+            code: 'P2023',
+            message: 'Invalid input!'
+        });
+
+        await expect(service.getUserById('bad-id')).rejects.toMatchObject({ status: 404 });
+    });
+
+    test('getUserById - other database error -> 500', async () => {
+        mockedPrisma.user.findUnique.mockRejectedValue(new Error('boom'));
+        await expect(service.getUserById('507f1f77bcf86cd799439011')).rejects.toMatchObject({ status: 500 });
+    });
+
+    //* ---- updateUserById ----
+    test('updateUserById - success updates and return mapped user (only provided fields)', async () => {
+        const dbUserUpdated = {
+            id: '1',
+            email: 'e', 
+            name: 'New Name', 
+            username: 'user', 
+            image: null, 
+            bio: 'bio'
+        };
+        mockedPrisma.user.update.mockResolvedValue(dbUserUpdated);
+
+        const result = await service.updateUserById('1', 'New Name', undefined, 'bio');
+        
+        expect(mockedPrisma.user.update).toHaveBeenCalledWith({
+            where: { id: '1' },
+            data: {
+                ...( 'New Name' !== undefined && { name: 'New Name' }),
+                ...( undefined !== undefined && { image: undefined }), // won't include
+                ...( 'bio' !== undefined && { bio: 'bio' }),
+            }
+        });
+        expect(result.payload).toEqual({
+            email: dbUserUpdated.email,
+            name: dbUserUpdated.name,
+            username: dbUserUpdated.username,
+            image: null,
+            bio: 'bio'
+        });
+    });
+
+    test('updateUserById - Prisma P2023 -> 404', async () => {
+        mockedPrisma.user.update.mockRejectedValue({ code: 'P2023' });
+        await expect(service.updateUserById('bad', 'n', null, 'b')).rejects.toMatchObject({ status: 404 });
+    });
+
+    test('updateUserById - other database error -> 500', async () => {
+        mockedPrisma.user.update.mockRejectedValue(new Error('update fail'));
+        await expect(service.updateUserById('1', 'n', null, 'b')).rejects.toMatchObject({ status: 500 });
+    });
+
+    //* ---- deleteUserById ----
+    test('deleteUserById - success deletes user', async () => {
+        const dbUser = { id: 'del1', email: 'x', name: 'X', username: 'x' };
+        mockedPrisma.user.findUnique.mockResolvedValue(dbUser);
+        mockedPrisma.user.delete.mockResolvedValue(dbUser);
+
+        await expect(service.deleteUserById(dbUser.id)).resolves.toBeUndefined();
+        
+        expect(mockedPrisma.user.findUnique).toHaveBeenCalledWith({ where: { id: dbUser.id } });
+        expect(mockedPrisma.user.delete).toHaveBeenCalledWith({ where: { id: dbUser.id } });
+    });
+
+    test('deleteUserById - not found -> 404', async () => {
+        mockedPrisma.user.findUnique.mockResolvedValue(null);
+        await expect(service.deleteUserById('missing')).rejects.toMatchObject({ status: 404 });
+    });
+
+    test('deleteUserById - Prisma P2023 -> 404', async () => {
+        mockedPrisma.user.findUnique.mockRejectedValue({ code: 'P2023' });
+        await expect(service.deleteUserById('bad')).rejects.toMatchObject({ status: 404 });
+    });
+
+    test('deleteUserById - other db error -> 500', async () => {
+        mockedPrisma.user.findUnique.mockRejectedValue(new Error('boom'));
+        await expect(service.deleteUserById('id')).rejects.toMatchObject({ status: 500 });
+    });
 });

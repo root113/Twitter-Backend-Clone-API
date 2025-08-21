@@ -53,6 +53,8 @@ export class TweetService {
                 message: 'Tweet has been created successfuly'
             };
         } catch(err: any) {
+            if(err instanceof HttpError) throw err;
+
             if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
@@ -78,6 +80,8 @@ export class TweetService {
             const payload = allTweets.map(tweet => toTweetResponse(tweet));            
             return { payload, message: 'Operation successful' };
         } catch(err: any) {
+            if(err instanceof HttpError) throw err;
+
             if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
@@ -104,6 +108,8 @@ export class TweetService {
                 message: 'Successfuly retrieved tweet'
             };
         } catch(err: any) {
+            if(err instanceof HttpError) throw err;
+
             if (err?.code === 'P2023') {
                 console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
@@ -142,6 +148,8 @@ export class TweetService {
                 message: 'Tweet has been updated successfuly'
             };
         } catch(err: any) {
+            if(err instanceof HttpError) throw err;
+
             if (err?.code === 'P2023') {
                 console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);
@@ -166,6 +174,8 @@ export class TweetService {
             await prisma.tweet.delete({ where: { id: tweetId } });
             console.log('Tweet has been deleted successfuly');
         } catch(err: any) {
+            if(err instanceof HttpError) throw err;
+            
             if (err?.code === 'P2023') {
                 console.log(Logger.LOG_TWEET_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_TWEET_NOT_FOUND);

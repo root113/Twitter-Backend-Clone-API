@@ -60,6 +60,8 @@ export class UserService {
                 message: 'Successfuly retrieved user information'
             };
         } catch(err: any) {
+            if(err instanceof HttpError) throw err;
+
             if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
@@ -99,6 +101,8 @@ export class UserService {
                 message: 'User has been updated successfuly'
             };
         } catch(err: any) {
+            if(err instanceof HttpError) throw err;
+
             if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
@@ -123,6 +127,8 @@ export class UserService {
             await prisma.user.delete({ where: { id: userId} });
             console.log('User has been deleted successfuly');
         } catch(err: any) {
+            if(err instanceof HttpError) throw err;
+
             if (err?.code === 'P2023') {
                 console.log(Logger.LOG_USER_NOT_FOUND + ' (Prisma P2023)');
                 throw new HttpError(404, Logger.LOG_USER_NOT_FOUND);
