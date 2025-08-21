@@ -247,3 +247,11 @@ describe('userController (unit)', () => {
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
     });
 });
+
+
+/*
+    TODO: Create integration tests/supertests 
+    TODO: Add a few edge-case tests
+    TODO: Convert these controller tests to use a single mocked service per file to reduce doMock boilerplate
+    TODO: Add integration tests that exercise middleware + controllers together using supertest
+*/
