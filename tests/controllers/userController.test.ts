@@ -65,6 +65,25 @@ describe('userController (unit)', () => {
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
     });
 
+    test('createUser - missing fields -> forwarded to next', async () => {
+        const err = new Error('Invalid input');
+        jest.doMock('../../src/services/userService', () => ({
+            UserService: jest.fn().mockImplementation(() => ({
+                createUser: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { createUser } = await import('../../src/controllers/userController');
+        const req: any = { body: {} };
+        const res: any = {};
+        const next = jest.fn();
+
+        createUser(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
+
     //* ---- listAllUsers ----
     test('listAllUsers - success -> responds 200 with list', async () => {
         const fakeResponse = { payload: [{ email: 'a@b', name: 'A', username: 'aa' }], message: 'ok' };
@@ -156,6 +175,25 @@ describe('userController (unit)', () => {
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
     });
 
+    test('getUserById - invalid id format -> forwarded to next', async () => {
+        const err = new Error('Invalid ID');
+        jest.doMock('../../src/services/userService', () => ({
+            UserService: jest.fn().mockImplementation(() => ({
+                getUserById: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { getUserById } = await import('../../src/controllers/userController');
+        const req: any = { params: { id: 'not-an-id' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        getUserById(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
+
     //* ---- updateUserById ----
     test('updateUserById - success -> responds 200 with payload', async () => {
         const fakeResponse = { payload: { email: 'b@b', name: 'B2', username: 'bb' }, message: 'updated' };
@@ -199,6 +237,44 @@ describe('userController (unit)', () => {
 
         expect(next).toHaveBeenCalled();
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
+    });
+
+    test('updateUserById - invalid id - forwarded to next', async () => {
+        const err = new Error('Invalid ID');
+        jest.doMock('../../src/services/userService', () => ({
+            UserService: jest.fn().mockImplementation(() => ({
+                updateUserById: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { updateUserById } = await import('../../src/controllers/userController');
+        const req: any = { body: { name: 'John Doe' }, params: { id: 'not-an-id' } }
+        const res: any = {};
+        const next = jest.fn();
+
+        updateUserById(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
+
+    test('updateUserById - missing fileds -> forwarded to next', async () => {
+        const err = new Error('Invalid input');
+        jest.doMock('../../src/services/userService', () => ({
+            UserService: jest.fn().mockImplementation(() => ({
+                updateUserById: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { updateUserById } = await import('../../src/controllers/userController');
+        const req: any = { body: {}, params: 'u1' };
+        const res: any = {};
+        const next = jest.fn();
+
+        updateUserById(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
     });
 
     //* ---- deleteUserById ----
@@ -246,12 +322,30 @@ describe('userController (unit)', () => {
         expect(next).toHaveBeenCalled();
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
     });
+
+    test('deleteUserById - invalid id format -> forwarded to next', async () => {
+        const err = new Error('Invalid ID');
+        jest.doMock('../../src/services/userService', () => ({
+            UserService: jest.fn().mockImplementation(() => ({
+                deleteUserById: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { deleteUserById } = await import('../../src/controllers/userController');
+        const req: any = { params: { id: 'not-an-id' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        deleteUserById(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
 });
 
 
 /*
     TODO: Create integration tests/supertests 
-    TODO: Add a few edge-case tests
     TODO: Convert these controller tests to use a single mocked service per file to reduce doMock boilerplate
     TODO: Add integration tests that exercise middleware + controllers together using supertest
 */

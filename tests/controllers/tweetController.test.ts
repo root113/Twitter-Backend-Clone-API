@@ -56,6 +56,44 @@ describe('tweetController (unit)', () => {
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
     });
 
+    test('createTweet - missing content -> forwarded to next', async () => {
+        const err = new Error('Content required');
+        jest.doMock('../../src/services/tweetService', () => ({
+            TweetService: jest.fn().mockImplementation(() => ({
+                createTweet: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { createTweet } = await import('../../src/controllers/tweetController');
+        const req: any = { body: { userId: 'u1' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        createTweet(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
+
+    test('createTweet - invalid user ID - forwarded to next', async () => {
+        const err = new Error('Invalid user ID');
+        jest.doMock('../../src/services/tweetService', () => ({
+            TweetService: jest.fn().mockImplementation(() => ({
+                createTweet: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { createTweet } = await import('../../src/controllers/tweetController');
+        const req: any = { body: { content: 'hi', userId: 'not-an-id' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        createTweet(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
+
     //* ---- listAllTweets ----
     test('listAllTweets - success -> responds 200 with payload', async () => {
         const fakeResponse = { payload: [{ content: 'a', image: null, impression: 1 }], message: 'ok' };
@@ -100,6 +138,25 @@ describe('tweetController (unit)', () => {
 
         expect(next).toHaveBeenCalled();
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
+    });
+
+    test('listAllTweets - invalid query param (user ID) -> forwarded to next', async () => {
+        const err = new Error('Invalid user ID');
+        jest.doMock('../../src/services/tweetService', () => ({
+            TweetService: jest.fn().mockImplementation(() => ({
+                listAllUserTweets: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { listAllTweets } = await import('../../src/controllers/tweetController');
+        const req: any = { query: { userId: 'not-an-id' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        listAllTweets(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
     });
 
     //* ---- getTweetById ----
@@ -148,6 +205,25 @@ describe('tweetController (unit)', () => {
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
     });
 
+    test('getTweetById - invalid id -> forwarded to next', async () => {
+        const err = new Error('Invalid id');
+        jest.doMock('../../src/services/tweetService', () => ({
+            TweetService: jest.fn().mockImplementation(() => ({
+                getTweetById: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { getTweetById } = await import('../../src/controllers/tweetController');
+        const req: any = { params: { userId: 'not-an-id' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        getTweetById(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
+
     //* ---- updateTweetById ----
     test('updateTweetById - success -> responds 200 with payload', async () => {
         const fakeResponse = { payload: { content: 'new', image: null, impression: 5 }, message: 'updated' };
@@ -194,6 +270,44 @@ describe('tweetController (unit)', () => {
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
     });
 
+    test('updateTweetById - invalid id -> forwarded to next', async () => {
+        const err = new Error('Invalid id');
+        jest.doMock('../../src/services/tweetService', () => ({
+            TweetService: jest.fn().mockImplementation(() => ({
+                updateTweetById: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { updateTweetById } = await import('../../src/controllers/tweetController');
+        const req: any = { body: { content: 'hello' }, params: { id: 'not-an-id' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        updateTweetById(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
+
+    test('updateTweetById - missing fields -> forwarded to next', async () => {
+        const err = new Error('Missing fields, nothing to update');
+        jest.doMock('../../src/services/tweetService', () => ({
+            TweetService: jest.fn().mockImplementation(() => ({
+                updateTweetById: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { updateTweetById } = await import('../../src/controllers/tweetController');
+        const req: any = { body: {}, params: { id: 'not-an-id' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        updateTweetById(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
+    });
+
     //* ---- deleteTweetById ----
     test('deleteTweetById - success -> responds 204 and sets headers', async () => {
         jest.doMock('../../src/services/tweetService', () => ({
@@ -238,5 +352,24 @@ describe('tweetController (unit)', () => {
 
         expect(next).toHaveBeenCalled();
         expect((next.mock.calls[0] as any[])[0]).toBe(err);
+    });
+
+    test('deleteTweetById - invalid id -> forwarded to next', async () => {
+        const err = new Error('Invalid id');
+        jest.doMock('../../src/services/tweetService', () => ({
+            TweetService: jest.fn().mockImplementation(() => ({
+                deleteTweetById: jest.fn().mockRejectedValue(err)
+            }))
+        }));
+
+        const { deleteTweetById } = await import('../../src/controllers/tweetController');
+        const req: any = { params: { id: 'not-an-id' } };
+        const res: any = {};
+        const next = jest.fn();
+
+        deleteTweetById(req, res, next);
+        await new Promise(setImmediate);
+
+        expect(next).toHaveBeenCalledWith(err);
     });
 });

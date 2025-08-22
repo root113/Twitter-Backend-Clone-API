@@ -133,6 +133,11 @@ export class TweetService {
         };
 
         try {
+            if(!content && !image) {
+                console.log('No changes made, provide any fields to update');
+                throw new HttpError(400, 'No changes made, provide any fields to update');
+            }
+
             const getTweet = await prisma.tweet.update({ 
                 where: { id: tweetId }, 
                 data
