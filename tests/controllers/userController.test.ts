@@ -343,9 +343,7 @@ describe('userController (unit)', () => {
     });
 });
 
-
 /*
     TODO: Create integration tests/supertests 
-    TODO: Convert these controller tests to use a single mocked service per file to reduce doMock boilerplate
     TODO: Add integration tests that exercise middleware + controllers together using supertest
 */
